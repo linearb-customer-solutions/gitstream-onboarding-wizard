@@ -399,6 +399,10 @@ pipelines:
         } else {
           statusEl.innerText = "✅ Branches created!";
         }
+
+        const step5 = document.getElementById("step5");
+        step5.classList.remove("hidden");
+        step5.open = true;
       }
     }
   </script>
@@ -412,11 +416,11 @@ pipelines:
       Create a Bitbucket user containing <code>gitstream-cm</code> in the username. Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines. Tip: you can create a user with the same email address as your own, e.g., <code>user+gitstream-cm@organization.com</code>.
     </p>
     <p>
-      NOTE. If you can't create a dedicated user, as a workaround you can use your own account, adjust your username to include <code>gitstream-cm</code> <a href="https://bitbucket.org/account/settings/username/change/">here</a>. This will cause gitStream to ignore comments from your acccount to prevent getting in an infinite loop.
+      NOTE. If you can't create a dedicated user, as a workaround you can use an admin account, adjust the username to include <code>gitstream-cm</code> <a href="https://bitbucket.org/account/settings/username/change/">here</a>. This will cause gitStream to ignore comments from your acccount to prevent getting in an infinite loop.
     </p>
     <p>
       <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>Connect to LinearB</strong></a>
-      Make sure you're logged in as <code>gitstream-cm</code> on GitLab and as an <strong>admin</strong> on LinearB.
+      making sure you're logged in as <code>gitstream-cm</code> on GitLab and as an <strong>admin</strong> on LinearB.
     </p>
     <ol>
       <li>Click on <strong>Add Repositories</strong></li>

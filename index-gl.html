@@ -465,15 +465,15 @@ tester-job:
       gitStream automation rules are executed by the user account configured when you authorize LinearB. A dedicated GitLab user such as <strong>gitstream-cm</strong> is recommended for clarity and auditing.
     </p>
     <p>
-      NOTE. If you can't create a dedicated user, as a workaround you can use an admin account, adjust your username to include <code>gitstream-cm</code> <a href="https://gitlab.com/-/profile/account">here</a>. This will cause gitStream to ignore comments from your acccount to prevent getting in an infinite loop.
+      <a id="create-user-link" href="#" target="_blank"><strong>Create a Gitlab user</strong></a>
+      containing <code>gitstream-cm</code> in the username. Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines. Tip: you can create a user with the same email address as your own, e.g., <code>user+gitstream-cm@organization.com</code>.
     </p>
     <p>
-      <a id="create-user-link" href="#" target="_blank"><strong>Create the user</strong></a>
-      Create a GitLab user containing <code>gitstream-cm</code> in the username. Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines. Tip: you can create a user with the same email address as your own, e.g., <code>user+gitstream-cm@organization.com</code>.
+      NOTE. If you can't create a dedicated user, as a workaround you can use an admin account, adjust the username to include <code>gitstream-cm</code> <a href="https://gitlab.com/-/profile/account">here</a>. This will cause gitStream to ignore comments from your acccount to prevent getting in an infinite loop.
     </p>
     <p>
       <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>Connect to LinearB</strong></a>
-      Make sure you're logged in as <code>gitstream-cm</code> on GitLab and as an <strong>admin</strong> on LinearB.
+      making sure you're logged in as <code>gitstream-cm</code> on GitLab and as an <strong>admin</strong> on LinearB.
     </p>
     <ol>
       <li>Click on <strong>Add Repositories</strong></li>
