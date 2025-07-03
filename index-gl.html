@@ -35,9 +35,9 @@
     <summary>1. Create Personal Access Token</summary>
     <p>
       Log in with a GitLab user that is either an <strong>admin</strong> or has sufficient permissions,
-      then create a new Personal Access Token:
+      then create a
       <a href="https://gitlab.com/-/user_settings/personal_access_tokens" target="_blank">
-        https://gitlab.com/-/user_settings/personal_access_tokens
+         new Personal Access Token
       </a>
     </p>
     <p>The token must have the following scope:</p>
@@ -47,9 +47,9 @@
     <p style="font-size: 0.9rem; color: #555;">Copy the token — it will only be shown once.</p>
   </details>
 
-  <details class="step" id="step2">
+  <details class="step" id="step2" open>
     <summary>2. Provide GitLab Token</summary>
-    <input type="text" id="token" placeholder="GitLab Token" oninput="loadGroups()" />
+    <input type="password" id="token" placeholder="GitLab Token" oninput="loadGroups()" />
     <span id="token-spinner" class="loading-spinner" style="display: none;"></span>
   </details>
 
@@ -61,7 +61,7 @@
 
   <details id="install-step" class="step hidden">
     <summary>4. Fork gitStream Demo Project</summary>
-    <p>Fork the <code>gitstream-demo</code> project from <code>gitstream-workshop1/gitstream-demo</code> into your GitLab namespace:</p>
+    <p>Fork the <code>gitstream-demo</code> project into your GitLab namespace:</p>
     <button id="install-link" onclick="importDemoProject()">🚀 Fork gitStream Demo Project</button>
   </details>
 
@@ -384,13 +384,23 @@ tester-job:
       // Fetch branches of forked project
       let forkedProjectId;
       try {
-        const forkedRes = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(groupPath + "/gitstream-demo")}`, {
-          headers: {
-            "PRIVATE-TOKEN": token
+        let forkedProject;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const forkedRes = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(groupPath + "/gitstream-demo")}`, {
+            headers: {
+              "PRIVATE-TOKEN": token
+            }
+          });
+          if (forkedRes.ok) {
+            forkedProject = await forkedRes.json();
+            break;
           }
-        });
-        if (!forkedRes.ok) throw new Error("Failed to fetch forked project");
-        const forkedProject = await forkedRes.json();
+          await new Promise(r => setTimeout(r, 2000)); // wait 2s between attempts
+        }
+        if (!forkedProject) {
+          statusEl.innerText = "❌ Failed to fetch forked project after multiple attempts";
+          return;
+        }
         forkedProjectId = forkedProject.id;
       } catch (err) {
         statusEl.innerText = "❌ " + err.message;
@@ -431,23 +441,39 @@ tester-job:
 
         if (!mrRes.ok) {
           const error = await mrRes.json();
-          statusEl.innerText = (`⚠️ Failed to create MR for ${branch.name}: ${error.message || mrRes.statusText}`);
+          statusEl.innerText = (`✅ MR exists for ${branch.name}`);
         } else {
           statusEl.innerText = "✅ Branches created!";
+
+          const userStep = document.getElementById("step5");
+          if (userStep) {
+            userStep.classList.remove("hidden");
+            userStep.open = true;
+          }
+          const createUserLink = document.getElementById("create-user-link");
+          const groupPath = groupSelect.options[groupSelect.selectedIndex]?.dataset.path;
+          if (groupPath && createUserLink) {
+            createUserLink.href = `https://gitlab.com/groups/${groupPath}/-/group_members`;
+          }
         }
       }
     }
   </script>
-  <details class="step hidden" id="step6">
-    <summary>6. Connect Repositories in LinearB</summary>
+  <details class="step hidden" id="step5">
+    <summary>5. Designate a gitStream User Account</summary>
     <p>
-      Log in to LinearB as an <strong>admin user</strong> at:
-      <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank">
-        https://app.linearb.io/settings/git/repositories?isOrgSettings=true
-      </a>
+      gitStream automation rules are executed by the user account configured when you authorize LinearB. A dedicated GitLab user such as <strong>gitstream-cm</strong> is recommended for clarity and auditing.
     </p>
     <p>
-      Make sure you're logged in as the <code>gitstream-cm</code> user in GitLab and an <strong>admin</strong> in LinearB.
+      NOTE. If you can't create a dedicated user, as a workaround you can use an admin account, adjust your username to include <code>gitstream-cm</code> <a href="https://gitlab.com/-/profile/account">here</a>. This will cause gitStream to ignore comments from your acccount to prevent getting in an infinite loop.
+    </p>
+    <p>
+      <a id="create-user-link" href="#" target="_blank"><strong>Create the user</strong></a>
+      Create a GitLab user containing <code>gitstream-cm</code> in the username. Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines. Tip: you can create a user with the same email address as your own, e.g., <code>user+gitstream-cm@organization.com</code>.
+    </p>
+    <p>
+      <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>Connect to LinearB</strong></a>
+      Make sure you're logged in as <code>gitstream-cm</code> on GitLab and as an <strong>admin</strong> on LinearB.
     </p>
     <ol>
       <li>Click on <strong>Add Repositories</strong></li>
