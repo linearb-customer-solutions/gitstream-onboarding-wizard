@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>gitStream Setup Wizard - Bitbucket</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
+    input, button, select { width: 100%; padding: 0.5rem; margin-top: 0.5rem; }
+    .hidden { display: none; }
+    .step { margin-bottom: 2rem; }
+    code { background: #f3f3f3; padding: 2px 4px; border-radius: 4px; }
+    .loading-spinner {
+      display: inline-block;
+      margin-left: 0.5rem;
+      width: 16px;
+      height: 16px;
+      border: 3px solid #ccc;
+      border-top: 3px solid #333;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧 gitStream Setup Wizard - Bitbucket</h1>
+
+  <details class="step" id="step1" open>
+    <summary>1. Create App Password</summary>
+    <p>
+      Log in with a Bitbucket user that is either an <strong>admin</strong> or has the following permissions,
+      then create a new App Password:
+      <a href="https://bitbucket.org/account/settings/app-passwords/new" target="_blank">
+        https://bitbucket.org/account/settings/app-passwords/new
+      </a>
+    </p>
+    <p>The app password must have the following permissions:</p>
+    <ul>
+      <li><code>read:pipeline:bitbucket</code></li>
+      <li><code>write:pipeline:bitbucket</code></li>
+      <li><code>read:pullrequest:bitbucket</code></li>
+      <li><code>write:pullrequest:bitbucket</code></li>
+      <li><code>admin:repository:bitbucket</code></li>
+      <li><code>write:repository:bitbucket</code></li>
+      <li><code>read:repository:bitbucket</code></li>
+      <li><code>read:account</code></li>
+      <li><code>read:me</code></li>
+      <li><code>read:project:bitbucket</code></li>
+      <li><code>read:workspace:bitbucket</code></li>
+      <li><code>read:user:bitbucket</code></li>
+    </ul>
+    <p style="font-size: 0.9rem; color: #555;">Copy the password — it will only be shown once.</p>
+  </details>
+
+  <details class="step" id="step2" open>
+    <summary>2. Provide App Password</summary>
+    <input type="email" id="email" placeholder="email (Bitbucket login)" />
+    <input type="password" id="token" placeholder="app_password" oninput="loadAccounts()" />
+    <span id="token-spinner" class="loading-spinner" style="display: none;"></span>
+  </details>
+
+  <details id="org-step" class="step hidden">
+    <summary>3. Select where to create the gitStream repo</summary>
+    <select id="account-list"></select>
+    <button onclick="createRepo()">📦 Create gitStream Repo</button>
+  </details>
+
+  <details id="install-step" class="step hidden">
+    <summary>4. Fork gitStream Demo Repository</summary>
+    <p>Fork the <code>gitstream-demo</code> repository from <code>gitstream-workshop/gitstream-demo</code> into your Bitbucket workspace:</p>
+    <button id="install-link" onclick="importDemoRepo()">🚀 Fork gitStream Demo Repo</button>
+  </details>
+
+  <div id="status" class="step hidden"></div>
+
+  <script>
+    const emailInput = document.getElementById("email");
+    const tokenInput = document.getElementById("token");
+    const accountSelect = document.getElementById("account-list");
+    let token = "";
+    const sourceWorkspace = "gitstream-workshop";
+    const sourceRepoSlug = "gitstream-demo-seeder";
+
+    const gitstreamConfigContent = `# -*- mode: yaml -*-
+# This example configuration provides basic automations to get started with gitStream.
+# View the gitStream quickstart for more examples: https://docs.gitstream.cm/examples/
+manifest:
+  version: 1.0
+
+
+automations:
+  # Add a label indicating how long it will take to review the PR.
+  estimated_time_to_review:
+    if:
+      - true
+    run:
+      - action: add-comment@v1
+        args:
+          comment: "{{ calc.etr }} min review"
+
+  # Post a comment that lists the best experts for the files that were modified.
+  explain_code_experts:
+    if:
+      - true
+    run:
+      - action: explain-code-experts@v1
+        args:
+          gt: 10
+
+  linearb_ai_review:
+    on:
+      - pr_created
+      - commit
+    if:
+      - {{ not pr.draft }}
+      - {{ not is.bot }}
+    run:
+      - action: code-review@v1
+        args:
+          approve_on_LGTM: {{ calc.safe_changes }}
+
+  linearb_ai_description:
+    on:
+      - pr_created
+      - commit
+    if:
+      - {{ not pr.draft }}
+      - {{ not is.bot }}
+    run:
+      - action: describe-changes@v1
+        args:
+          concat_mode: append
+
+# +----------------------------------------------------------------------------+
+# | Custom Expressions                                                         |
+# | https://docs.gitstream.cm/how-it-works/#custom-expressions                 |
+# +----------------------------------------------------------------------------+
+
+calc:
+  etr: {{ branch | estimatedReviewTime }}
+  safe_changes: {{ is.formatting or is.docs or is.tests or is.image }}
+
+colors:
+  red: 'b60205'
+  yellow: 'fbca04'
+  green: '0e8a16'
+
+is:
+  formatting: {{ source.diff.files | isFormattingChange }}
+  docs: {{ files | allDocs }}
+  tests: {{ files | allTests }}
+  image: {{ files | allImages }}
+  bot: {{ pr.author | match(list=['github-actions', '_bot_', '[bot]', 'dependabot']) | some }}`;
+
+    const bitbucketPipelineContent = `# Code generated by gitStream - DO NOT EDIT
+image: atlassian/default-image:4
+
+pipelines:
+  custom:
+    gitstream:
+      - variables:
+          - name: client_payload
+            description: the client payload
+          - name: head_ref
+            description: the head sha
+          - name: base_ref
+            description: The base sha
+          - name: resolver_url
+            description: the resolver url to pass results to
+          - name: resolver_token
+            description: Optional resolver token for resolver service
+          - name: debug_mode
+            description: Debug mode
+            default: 'true'
+          - name: oauth_token
+            description: token to do operations in bitbucket
+          - name: full_repo
+            description: workspace/repo
+      - step:
+          name: /:\\ gitstream workflow automation
+          max-time: 15
+          clone:
+            enabled: false
+          services:
+            - docker
+          script:
+            - git clone https://x-token-auth:$oauth_token@bitbucket.org/$full_repo.git gitstream/repo
+            - git clone https://x-token-auth:$oauth_token@bitbucket.org/$BITBUCKET_WORKSPACE/$BITBUCKET_REPO_SLUG.git gitstream/cm
+            - cd gitstream/repo
+            - git fetch --all
+            - git checkout $base_ref
+            - git checkout $head_ref
+            - docker pull gitstream/rules-engine:latest
+            - |
+              docker run -v $BITBUCKET_CLONE_DIR/gitstream:/code \
+              -e HEAD_REF=$head_ref \
+              -e BASE_REF=$base_ref \
+              -e RUN_ID=$BITBUCKET_BUILD_NUMBER \
+              -e CLIENT_PAYLOAD="$client_payload" \
+              -e RULES_RESOLVER_URL=$resolver_url \
+              -e RULES_RESOLVER_TOKEN=$resolver_token \
+              -e DEBUG_MODE=$debug_mode gitstream/rules-engine:latest`;
+
+    async function loadAccounts() {
+      token = tokenInput.value.trim();
+      const orgStep = document.getElementById("org-step");
+      const spinner = document.getElementById("token-spinner");
+
+      if (token.length === 0) {
+        spinner.style.display = "none";
+        return;
+      }
+
+      spinner.style.display = "inline-block";
+
+      accountSelect.innerHTML = "";
+      const addOption = (uuid, username, type) => {
+        const option = document.createElement("option");
+        option.value = uuid;
+        option.dataset.login = username;
+        option.dataset.type = type;
+        option.textContent = `${username} (${type})`;
+        accountSelect.appendChild(option);
+      };
+
+      try {
+        // Fetch workspaces (equivalent to orgs)
+        const workspacesRes = await fetch("https://api.bitbucket.org/2.0/workspaces", {
+          headers: {
+            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
+          }
+        });
+        if (!workspacesRes.ok) throw new Error("Failed to load workspaces");
+        const workspaces = await workspacesRes.json();
+        workspaces.values.forEach(ws => addOption(ws.uuid, ws.slug, "workspace"));
+
+        // Show org-step if accounts loaded
+        orgStep.classList.remove("hidden");
+        // Collapse the first two steps after loading accounts
+        document.querySelectorAll("details.step").forEach((el, i) => {
+          if (i < 3) el.open = false;
+        });
+        orgStep.open = true;
+      } catch (err) {
+        console.error("Error loading accounts:", err);
+        document.getElementById("status").classList.remove("hidden");
+        document.getElementById("status").innerText = "❌ " + err.message;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+
+    async function createRepo() {
+      const selected = accountSelect.options[accountSelect.selectedIndex];
+      const workspace = selected.dataset.login;
+      const repoSlug = "cm";
+      const statusEl = document.getElementById("status");
+
+      statusEl.classList.remove("hidden");
+      statusEl.innerText = "📦 Creating repository…";
+
+      try {
+        await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            scm: "git",
+            is_private: true
+          })
+        });
+
+        // Enable pipelines
+        const res = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/pipelines_config`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            enabled: true
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(`Failed to enable pipelines: ${err.error?.message || res.statusText}`);
+        }
+
+        async function uploadFileToRepo(path, content, message) {
+          const form = new FormData();
+          form.append('message', message);
+          // Bitbucket expects files: use path as the key
+          form.append(path, new Blob([content], { type: 'text/plain' }));
+          const res = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
+            },
+            body: form
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(`Failed to upload ${path}: ${err.error?.message || res.statusText}`);
+          }
+        }
+
+        await uploadFileToRepo("gitstream.cm", gitstreamConfigContent, "Add gitstream-cm");
+        await uploadFileToRepo("bitbucket-pipelines.yml", bitbucketPipelineContent, "Add bitbucket-pipelines.yml");
+
+        statusEl.innerText = "✅ Repository created!";
+        const installStep = document.getElementById("install-step");
+
+        installStep.classList.remove("hidden");
+        installStep.open = true;
+
+      } catch (err) {
+        statusEl.innerText = err.message;
+        console.error(err);
+      }
+    }
+
+    async function importDemoRepo() {
+      const selected = accountSelect.options[accountSelect.selectedIndex];
+      const workspace = selected.dataset.login;
+      const statusEl = document.getElementById("status");
+      statusEl.classList.remove("hidden");
+      statusEl.innerText = "🔍 Checking if gitstream-demo already exists…";
+
+      statusEl.innerText = `🍴 Forking gitstream-demo from ${sourceWorkspace}…`;
+
+      const forkRes = await fetch(
+        `https://api.bitbucket.org/2.0/repositories/${sourceWorkspace}/${sourceRepoSlug}/forks`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: "gitstream-demo",
+            workspace: {
+              slug: workspace
+            }
+          })
+        }
+      );
+
+      if (!forkRes.ok) {
+        const err = await forkRes.json();
+        statusEl.innerText = `✅ gitstream-demo already exists. Skipping fork. ${err.error?.message || forkRes.statusText}`;
+      } else {
+        statusEl.innerText = "✅ Demo repo forked!";
+      }
+
+      const branchesRes = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/gitstream-demo/refs/branches`, {
+        headers: {
+          Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
+        }
+      });
+
+      if (!branchesRes.ok) throw new Error("❌ Failed to list branches");
+      const branchesData = await branchesRes.json();
+      const defaultBranch = branchesData.values.find(b => b.name === "main")?.name || branchesData.values[0].name;
+
+      statusEl.innerText = "Creating PRs…";
+
+      // Create PRs for non-default branches
+      for (const branch of branchesData.values) {
+        if (branch.name === defaultBranch) continue;
+
+        const prRes = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/gitstream-demo/pullrequests`, {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            title: `Demo ${branch.name}`,
+            source: {
+              branch: { name: branch.name }
+            },
+            destination: {
+              branch: { name: defaultBranch }
+            }
+          })
+        });
+
+        if (!prRes.ok) {
+          const error = await prRes.json();
+          statusEl.innerText = (`⚠️ Failed to create PR for ${branch.name}: ${error.error?.message || prRes.statusText}`);
+        } else {
+          statusEl.innerText = "✅ Branches created!";
+        }
+      }
+    }
+  </script>
+  <details class="step hidden" id="step6">
+    <summary>6. Connect Repositories in LinearB</summary>
+    <p>
+      Log in to LinearB as an <strong>admin user</strong> at:
+      <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank">
+        https://app.linearb.io/settings/git/repositories?isOrgSettings=true
+      </a>
+    </p>
+    <p>
+      Make sure you're logged in as the <code>gitstream-cm</code> user in Bitbucket and an <strong>admin</strong> in LinearB.
+    </p>
+    <ol>
+      <li>Click on <strong>Add Repositories</strong></li>
+      <li>Select both <code>cm</code> and <code>gitstream-demo</code></li>
+      <li>Click <strong>Connect gitStream</strong></li>
+      <li>Click <strong>Next</strong>, <strong>Next</strong>, and then <strong>Authorize</strong></li>
+      <li>Confirm that you've already completed the steps in this wizard</li>
+      <li>Enable the <strong>gitStream</strong> checkbox for any repo you want to automate</li>
+    </ol>
+  </details>
+</body>
+</html>
