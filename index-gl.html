@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>gitStream Setup Wizard - GitLab</title>
+  <title>🦊 GitLab gitStream Setup Wizard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
@@ -29,7 +29,7 @@
   </style>
 </head>
 <body>
-  <h1>🔧 gitStream Setup Wizard - GitLab</h1>
+  <h1>🔧🦊 GitLab gitStream Setup Wizard</h1>
 
   <details class="step" id="step1" open>
     <summary>1. Create Personal Access Token</summary>
@@ -174,8 +174,8 @@ gitstream-job:
   script:
     - ls -Fla
     - apk update && apk add git && apk add docker
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}${repoUrl} gitstream/repo
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}${cmUrl} gitstream/cm
+    - git clone https://gitlab-ci-token:$\{CI_JOB_TOKEN}$\{repoUrl} gitstream/repo
+    - git clone https://gitlab-ci-token:$\{CI_JOB_TOKEN}$\{cmUrl} gitstream/cm
     - cd gitstream && cd repo && git fetch --all && git checkout $base_ref && git pull && ls && git checkout $head_ref && git pull && ls
     - docker pull gitstream/rules-engine:latest
     - |
@@ -284,7 +284,7 @@ tester-job:
         }
 
         // Set minimum role to use pipeline variables
-        const minRoleRes = await fetch(`https://gitlab.com/api/v4/projects/${project.id}`, {
+        const minRoleRes = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(groupPath + "/" + projectName)}`, {
           method: "PUT",
           headers: {
             "PRIVATE-TOKEN": token,

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>🐙 GitHub gitStream Setup Wizard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
+    input, button, select { width: 100%; padding: 0.5rem; margin-top: 0.5rem; }
+    .hidden { display: none; }
+    .step { margin-bottom: 2rem; }
+    code { background: #f3f3f3; padding: 2px 4px; border-radius: 4px; }
+    .loading-spinner {
+      display: inline-block;
+      margin-left: 0.5rem;
+      width: 16px;
+      height: 16px;
+      border: 3px solid #ccc;
+      border-top: 3px solid #333;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧🐙 GitHub gitStream Setup Wizard</h1>
+
+  <details class="step" open id="step1">
+    <summary>1. Generate a GitHub token with the correct permissions</summary>
+    <a href="https://github.com/settings/tokens/new?scopes=repo,read:org,admin:repo_hook,workflow&description=gitStream+Setup+Wizard" target="_blank" onclick="document.getElementById('step1').open = false; document.getElementById('step2').open = true;">
+      🔐 <strong>Generate GitHub Token</strong>
+    </a>
+    <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+      <strong>Required scopes:</strong> <code>repo</code>, <code>read:org</code>, <code>admin:repo_hook</code>, <code>workflow</code><br>
+      These are <strong>already pre-filled</strong> — all you need to do is click <strong>Generate Token</strong> and paste it below.
+    </p>
+  </details>
+
+  <details class="step" id="step2">
+    <summary>2. Paste your GitHub token here</summary>
+    <input type="password" id="token" placeholder="ghp_..." oninput="loadAccounts()" />
+    <span id="token-spinner" class="loading-spinner" style="display: none;"></span>
+  </details>
+
+  <details id="org-step" class="step">
+    <summary>3. Select where to create the gitStream repo</summary>
+    <select id="account-list"></select>
+    <button onclick="createRepo()">📦 Create gitStream Repo</button>
+  </details>
+
+  <details id="install-step" class="step hidden">
+    <summary>4. Install gitStream GitHub App</summary>
+    <p>Install the gitStream GitHub App in your account or organization:</p>
+    <a id="install-link" target="_blank">🚀 Install gitStream</a>
+  </details>
+
+  <details id="demo-step" class="step hidden">
+    <summary>5. Create Demo Repo</summary>
+    <button onclick="createDemo()">🍴 Fork gitstream-demo</button>
+  </details>
+
+  <div id="status" class="step hidden"></div>
+
+  <details id="install-step" class="step hidden">
+    <summary>4. Click below to install gitStream in the selected org (if applicable)</summary>
+    <p>4. Click below to install gitStream in the selected org (if applicable):</p>
+    <a id="install-link" target="_blank">🚀 Install gitStream</a>
+  </details>
+
+  <script>
+    const tokenInput = document.getElementById("token");
+    const accountSelect = document.getElementById("account-list");
+    let token = "";
+
+    async function loadAccounts() {
+      token = tokenInput.value.trim();
+      const orgStep = document.getElementById("org-step");
+      const tokenField = document.getElementById("token");
+      const spinner = document.getElementById("token-spinner");
+
+      if (!/^gh[pousr]_[A-Za-z0-9_]{35,}$/.test(token)) {
+        spinner.style.display = "none";
+        return;
+      }
+
+      spinner.style.display = "inline-block";
+
+      accountSelect.innerHTML = "";
+      const addOption = (id, login, type) => {
+        const option = document.createElement("option");
+        option.value = id;
+        option.dataset.login = login;
+        option.dataset.type = type;
+        option.textContent = `${login} (${type})`;
+        accountSelect.appendChild(option);
+      };
+
+      try {
+        const userRes = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `token ${token}` }
+        });
+        const user = await userRes.json();
+        addOption(user.id, user.login, "user");
+
+        const orgsRes = await fetch("https://api.github.com/user/orgs", {
+          headers: { Authorization: `token ${token}` }
+        });
+        const orgs = await orgsRes.json();
+        orgs.forEach(org => addOption(org.id, org.login, "org"));
+
+        // Removed: document.getElementById("org-step").classList.remove("hidden");
+        // Collapse the first two steps after loading accounts
+        document.querySelectorAll("details.step").forEach((el, i) => {
+          if (i < 2) el.open = false;
+        });
+        orgStep.open = true;
+      } catch (err) {
+        console.error("Error loading accounts:", err);
+      } finally {
+        document.getElementById("token-spinner").style.display = "none";
+      }
+    }
+
+    async function createRepo() {
+      const createButton = document.querySelector('button[onclick="createRepo()"]');
+      createButton.classList.add("loading");
+      const selected = accountSelect.options[accountSelect.selectedIndex];
+      const type = selected.dataset.type;
+      const login = selected.dataset.login;
+      const id = selected.value;
+      const repoName = "cm";
+
+      const endpoint = type === "user"
+        ? "https://api.github.com/user/repos"
+        : `https://api.github.com/orgs/${login}/repos`;
+
+      try {
+        document.getElementById("status").classList.remove("hidden");
+        document.getElementById("status").innerText = "Creating repository…";
+
+        const createRes = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: "application/vnd.github+json"
+          },
+          body: JSON.stringify({
+            name: repoName,
+            private: true,
+            auto_init: true
+          })
+        });
+
+        if (!createRes.ok) {
+          const error = await createRes.json();
+          throw new Error(`Failed to create repo: ${error.message}`);
+        }
+
+        const apiBase = `https://api.github.com/repos/${login}/${repoName}/contents`;
+
+        await uploadFile(apiBase, "gitstream.cm", gitstreamConfig, "Add gitstream.cm");
+        await uploadFile(apiBase, ".github/workflows/gitstream.yml", githubWorkflow, "Add gitstream.yml");
+
+        document.getElementById("status").innerText = "✅ Repo created and configured.";
+
+        const installUrl = `https://github.com/apps/gitstream-cm/installations/new/permissions?target_id=${id}&target_type=${type === "org" ? "Organization" : "User"}`;
+        const link = document.getElementById("install-link");
+        link.href = installUrl;
+        link.textContent = `🚀 Install gitstream-cm in ${login}`;
+        document.getElementById("install-step").classList.remove("hidden");
+        document.getElementById("install-step").open = true;
+        document.getElementById("demo-step").classList.remove("hidden");
+        // Collapse the select-org step after creating the repo
+        document.querySelectorAll("details.step")[2].open = false;
+        createButton.classList.remove("loading");
+      } catch (err) {
+        document.getElementById("status").innerText = "❌ " + err.message;
+        createButton.classList.remove("loading");
+      }
+    }
+
+    async function uploadFile(apiBase, path, content, message) {
+      const url = `${apiBase}/${encodeURIComponent(path)}`;
+      const body = {
+        message,
+        content: btoa(unescape(encodeURIComponent(content)))
+      };
+
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: "application/vnd.github+json"
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(`Failed to upload ${path}: ${error.message}`);
+      }
+    }
+
+    const gitstreamConfig = `# -*- mode: yaml -*-
+# This example configuration provides basic automations to get started with gitStream.
+# View the gitStream quickstart for more examples: https://docs.gitstream.cm/examples/
+manifest:
+  version: 1.0
+
+automations:
+  # Use LinearB's AI service to review the changes
+  linearb_ai_review:
+    on:
+      - pr_created
+      - commit
+    if:
+      - {{ not pr.draft }}
+      - {{ not is.bot }}
+    run:
+      - action: code-review@v1
+        args:
+          approve_on_LGTM: {{ calc.safe_changes }}
+
+  # Use LinearB's AI service to add a description to the PR
+  linearb_ai_description:
+    on:
+      - pr_created
+      - commit
+    if:
+      - {{ not pr.draft }}
+      - {{ not is.bot }}
+    run:
+      - action: describe-changes@v1
+        args:
+          concat_mode: append
+
+  # Add a label indicating how long it will take to review the PR.
+  estimated_time_to_review:
+    if:
+      - true
+    run:
+      - action: add-label@v1
+        args:
+          label: "{{ calc.etr }} min review"
+          color: {{ colors.red if (calc.etr >= 20) else ( colors.yellow if (calc.etr >= 5) else colors.green ) }}
+
+  # Inform PR authors when they fail to reference Jira tickets in the PR title or description.
+  label_missing_jira_info:
+    if:
+      - {{ not (has.jira_ticket_in_title or has.jira_ticket_in_desc) }}
+    run:
+      - action: add-label@v1
+        args:
+          label: "missing-jira"
+          color: {{ colors.red }}
+      - action: add-comment@v1
+        args:
+          comment: |
+            This PR is missing a Jira ticket reference in the title or description.
+            Please add a Jira ticket reference to the title or description of this PR.
+
+  # Post a comment that lists the best experts for the files that were modified.
+  explain_code_experts:
+    on:
+      - pr_created
+      - pr_ready_for_review
+      - commit
+    if:
+      - true
+    run:
+      - action: explain-code-experts@v1
+        args:
+          gt: 10
+
+# +----------------------------------------------------------------------------+
+# | Custom Expressions                                                         |
+# | https://docs.gitstream.cm/how-it-works/#custom-expressions                 |
+# +----------------------------------------------------------------------------+
+
+calc:
+  etr: {{ branch | estimatedReviewTime }}
+  safe_changes: {{ is.formatting or is.docs or is.tests or is.image }}
+
+has:
+  jira_ticket_in_title: {{ pr.title | includes(regex=r/\b[A-Za-z]+-\d+\b/) }}
+  jira_ticket_in_desc: {{ pr.description | includes(regex=r/atlassian.net\\/browse\\/\w{1,}-\d{3,4}/) }}
+
+colors:
+  red: 'b60205'
+  yellow: 'fbca04'
+  green: '0e8a16'
+
+is:
+  formatting: {{ source.diff.files | isFormattingChange }}
+  docs: {{ files | allDocs }}
+  tests: {{ files | allTests }}
+  image: {{ files | allImages }}
+  bot: {{ pr.author | match(list=['github-actions', '_bot_', '[bot]', 'dependabot']) | some }};`
+
+    const githubWorkflow = `# Code generated by gitStream GitHub app - DO NOT EDIT
+name: gitStream workflow automation
+run-name: |
+  /:\\ gitStream: PR #\${{ fromJSON(fromJSON(github.event.inputs.client_payload)).pullRequestNumber }} from \${{ github.event.inputs.full_repository }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_payload:
+        description: The Client payload
+        required: true
+      full_repository:
+        description: the repository name include the owner in \`owner/repo_name\` format
+        required: true
+      head_ref:
+        description: the head sha
+        required: true
+      base_ref:
+        description: the base ref 
+        required: true
+      installation_id:
+        description: the installation id
+        required: false
+      resolver_url:
+        description: the resolver url to pass results to
+        required: true
+      resolver_token:
+        description: Optional resolver token for resolver service
+        required: false
+        default: ''
+
+jobs:
+  gitStream:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    name: gitStream workflow automation
+    steps:
+      - name: Evaluate Rules
+        uses: linear-b/gitstream-github-action@v2
+        id: rules-engine
+        with:
+          full_repository: \${{ github.event.inputs.full_repository }}
+          head_ref: \${{ github.event.inputs.head_ref }}
+          base_ref: \${{ github.event.inputs.base_ref }}
+          client_payload: \${{ github.event.inputs.client_payload }}
+          installation_id: \${{ github.event.inputs.installation_id }}
+          resolver_url: \${{ github.event.inputs.resolver_url }}
+          resolver_token: \${{ github.event.inputs.resolver_token }}`
+
+    async function createDemo() {
+      const selected = accountSelect.options[accountSelect.selectedIndex];
+      const login = selected.dataset.login;
+
+      try {
+        document.getElementById("status").classList.remove("hidden");
+        document.getElementById("status").innerText = "Forking demo repo…";
+
+        const forkRes = await fetch("https://api.github.com/repos/linear-b/gitstream-demo/forks", {
+          method: "POST",
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: "application/vnd.github+json"
+          },
+          body: JSON.stringify({
+            ...(selected.dataset.type === "org" ? { organization: login } : {}),
+            default_branch_only: false
+          })
+        });
+
+        if (!forkRes.ok) {
+          const error = await forkRes.json();
+          throw new Error(`Failed to fork demo repo: ${error.message}`);
+        }
+
+        document.getElementById("status").innerText = "✅ Forked successfully. Creating demo PRs…";
+
+        // Wait for fork to be ready
+        const forkFullName = `${login}/gitstream-demo`;
+        const branchesRes = await fetch(`https://api.github.com/repos/${forkFullName}/branches`, {
+          headers: { Authorization: `token ${token}` }
+        });
+        const branches = await branchesRes.json();
+        const branchList = Array.isArray(branches) ? branches : [];
+        const defaultBranch = branchList.some(b => b.name === "main") ? "main" : (branchList[0]?.name || "main");
+
+        for (const branch of branchList) {
+          if (branch.name === defaultBranch) continue;
+
+          await fetch(`https://api.github.com/repos/${forkFullName}/pulls`, {
+            method: "POST",
+            headers: {
+              Authorization: `token ${token}`,
+              Accept: "application/vnd.github+json"
+            },
+            body: JSON.stringify({
+              title: `Demo ${branch.name}`,
+              head: branch.name,
+              base: defaultBranch,
+              body: "This is a demo pull request generated by the setup wizard."
+            })
+          });
+        }
+
+        document.getElementById("status").innerText = "✅ Demo repo forked and PRs created.";
+      } catch (err) {
+        document.getElementById("status").innerText = "❌ " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
