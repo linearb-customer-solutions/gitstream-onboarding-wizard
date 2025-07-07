@@ -283,6 +283,22 @@ tester-job:
           statusEl.innerText = "✅ Project created!";
         }
 
+        // Set minimum role to use pipeline variables
+        const minRoleRes = await fetch(`https://gitlab.com/api/v4/projects/${project.id}`, {
+          method: "PUT",
+          headers: {
+            "PRIVATE-TOKEN": token,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ci_pipeline_variables_minimum_override_role: "developer"
+          })
+        });
+        if (!minRoleRes.ok) {
+          const err = await minRoleRes.json();
+          throw new Error(`Failed to update pipeline variable role: ${err.message || minRoleRes.statusText}`);
+        }
+
         const projectRes = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(groupPath + "/" + projectName)}`, {
           headers: {
             "PRIVATE-TOKEN": token
@@ -444,17 +460,17 @@ tester-job:
           statusEl.innerText = (`✅ MR exists for ${branch.name}`);
         } else {
           statusEl.innerText = "✅ Branches created!";
+        }
 
-          const userStep = document.getElementById("step5");
-          if (userStep) {
-            userStep.classList.remove("hidden");
-            userStep.open = true;
-          }
-          const createUserLink = document.getElementById("create-user-link");
-          const groupPath = groupSelect.options[groupSelect.selectedIndex]?.dataset.path;
-          if (groupPath && createUserLink) {
-            createUserLink.href = `https://gitlab.com/groups/${groupPath}/-/group_members`;
-          }
+        const userStep = document.getElementById("step5");
+        if (userStep) {
+          userStep.classList.remove("hidden");
+          userStep.open = true;
+        }
+        const createUserLink = document.getElementById("create-user-link");
+        const groupPath = groupSelect.options[groupSelect.selectedIndex]?.dataset.path;
+        if (groupPath && createUserLink) {
+          createUserLink.href = `https://gitlab.com/groups/${groupPath}/-/group_members`;
         }
       }
     }
