@@ -360,7 +360,7 @@ jobs:
         document.getElementById("status").classList.remove("hidden");
         document.getElementById("status").innerText = "Forking demo repo…";
 
-        const forkRes = await fetch("https://api.github.com/repos/linear-b/gitstream-demo/forks", {
+        const forkRes = await fetch("https://api.github.com/repos/vlussenburg/gitstream-demo/forks", {
           method: "POST",
           headers: {
             Authorization: `token ${token}`,
