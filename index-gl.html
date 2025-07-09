@@ -90,9 +90,10 @@ automations:
     if:
       - true
     run:
-      - action: add-comment@v1
+      - action: add-label@v1
         args:
-          comment: "{{ calc.etr }} min review"
+          label: "{{ calc.etr }} min review"
+          color: {{ colors.red if (calc.etr >= 20) else ( colors.yellow if (calc.etr >= 5) else colors.green ) }}
 
   # Post a comment that lists the best experts for the files that were modified.
   explain_code_experts:
@@ -470,6 +471,10 @@ tester-job:
           userStep.classList.remove("hidden");
           userStep.open = true;
         }
+        const connectToLinb = document.getElementById("step6");
+        if (connectToLinb) {
+          connectToLinb.classList.remove("hidden");
+        }
         const createUserLink = document.getElementById("create-user-link");
         const groupPath = groupSelect.options[groupSelect.selectedIndex]?.dataset.path;
         if (groupPath && createUserLink) {
@@ -481,18 +486,24 @@ tester-job:
   <details class="step hidden" id="step5">
     <summary>5. Designate a gitStream User Account</summary>
     <p>
-      gitStream automation rules are executed by the user account configured when you authorize LinearB. A dedicated GitLab user such as <strong>gitstream-cm</strong> is recommended for clarity and auditing.
+      gitStream automation rules are executed by the user account configured when you authorize LinearB. A dedicated GitLab user containing <strong>gitstream-cm</strong> in the username is required for clarity and auditing.
     </p>
     <p>
       <a id="create-user-link" href="#" target="_blank"><strong>Create a Gitlab user</strong></a>
-      containing <code>gitstream-cm</code> in the username. Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines. Tip: you can create a user with the same email address as your own, e.g., <code>user+gitstream-cm@organization.com</code>.
+      containing <code>gitstream-cm</code> in the username (e.g. <code>username-gitstream-cm</code> or <code>gitstream-cm_username</code>). Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines.
     </p>
     <p>
-      NOTE. If you can't create a dedicated user, as a workaround you can use an admin account, adjust the username to include <code>gitstream-cm</code> <a href="https://gitlab.com/-/profile/account">here</a>. This will cause gitStream to ignore comments from your acccount to prevent getting in an infinite loop.
+      Tip: you can create a user by reusing the same email address, e.g., <code>user+gitstream-cm@organization.com</code> (see the part after the `+` sign).
     </p>
     <p>
-      <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>Connect to LinearB</strong></a>
-      making sure you're logged in as <code>gitstream-cm</code> on GitLab and as an <strong>admin</strong> on LinearB.
+      After creating the user, make sure to log in to GitLab with this user account before proceeding to the next step.
+    </p>
+  </details>
+  <details class="step hidden" id="step6">
+   <summary>6. Connect GitLab to LinearB</summary>
+    <p>
+      Go to <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>LinearB</strong></a>
+      making sure you're logged in as <strong>the new <code>gitstream-cm</code> user on GitLab</strong> and as an <strong>admin</strong> on LinearB.
     </p>
     <ol>
       <li>Click on <strong>Add Repositories</strong></li>
