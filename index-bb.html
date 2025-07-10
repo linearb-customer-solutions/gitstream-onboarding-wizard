@@ -370,11 +370,16 @@ pipelines:
         statusEl.innerText = "✅ Demo repo forked!";
       }
 
-      const branchesRes = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/gitstream-demo/refs/branches`, {
-        headers: {
-          Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
-        }
-      });
+      let branchesRes;
+      while (true) {
+        branchesRes = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/gitstream-demo/refs/branches`, {
+          headers: {
+            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
+          }
+        });
+        if (branchesRes.ok) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
       if (!branchesRes.ok) throw new Error("❌ Failed to list branches");
       const branchesData = await branchesRes.json();
