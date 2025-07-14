@@ -278,6 +278,29 @@ pipelines:
           })
         });
 
+        async function uploadFileToRepo(path, content, message) {
+          const form = new FormData();
+          form.append('message', message);
+          // Bitbucket expects files: use path as the key
+          form.append(path, new Blob([content], { type: 'text/plain' }));
+          const res = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
+            },
+            body: form
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(`Failed to upload ${path}: ${err.error?.message || res.statusText}`);
+          }
+        }
+
+        await uploadFileToRepo("gitstream.cm", gitstreamConfigContent, "Add gitstream-cm");
+        await uploadFileToRepo("bitbucket-pipelines.yml", bitbucketPipelineContent, "Add bitbucket-pipelines.yml");
+
+        statusEl.innerText = "✅ Repository created!";
+
         // Enable pipelines with retry
         let enableSuccess = false;
         for (let attempt = 1; attempt <= 3; attempt++) {
@@ -304,28 +327,6 @@ pipelines:
           throw new Error(`Failed to enable pipelines after 3 attempts. Does your user have 2FA enabled?`);
         }
 
-        async function uploadFileToRepo(path, content, message) {
-          const form = new FormData();
-          form.append('message', message);
-          // Bitbucket expects files: use path as the key
-          form.append(path, new Blob([content], { type: 'text/plain' }));
-          const res = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
-            },
-            body: form
-          });
-          if (!res.ok) {
-            const err = await res.json();
-            throw new Error(`Failed to upload ${path}: ${err.error?.message || res.statusText}`);
-          }
-        }
-
-        await uploadFileToRepo("gitstream.cm", gitstreamConfigContent, "Add gitstream-cm");
-        await uploadFileToRepo("bitbucket-pipelines.yml", bitbucketPipelineContent, "Add bitbucket-pipelines.yml");
-
-        statusEl.innerText = "✅ Repository created!";
         const installStep = document.getElementById("install-step");
 
         installStep.classList.remove("hidden");
@@ -415,8 +416,8 @@ pipelines:
           statusEl.innerText = "✅ Branches created!";
         }
 
-        const step5 = document.getElementById("step5");
-        const step6 = document.getElementById("step6").classList.remove("hidden");;
+        const step5 = document.getElementById("step5").classList.remove("hidden");
+        const step6 = document.getElementById("step6").classList.remove("hidden");
       }
     }
   </script>
@@ -426,7 +427,6 @@ pipelines:
       gitStream automation rules are executed by the user account configured when you authorize LinearB. A dedicated Bitbucket user such as <strong>gitstream-cm</strong> is recommended for clarity and auditing.
     </p>
     <p>
-      <a id="create-user-link" href="#" target="_blank"><strong>Create the user</strong></a>
       Create a Bitbucket user containing <code>gitstream-cm</code> in the username. Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines. Tip: you can create a user with the same email address as your own, e.g., <code>user+gitstream-cm@organization.com</code>.
     </p>
     <p>
