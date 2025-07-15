@@ -318,6 +318,10 @@ pipelines:
 
         statusEl.innerText = "✅ Repository created!";
 
+        await sleep(1000); // wait 1s to ensure repo is ready
+
+        preloadBitbucketPages(workspac, repoSlug);
+
         // Enable pipelines with retry
         let enableSuccess = false;
         for (let attempt = 1; attempt <= 3; attempt++) {
@@ -531,6 +535,14 @@ pipelines:
       if (newPRLink) {
         window.open(newPRLink, "_blank");
       }
+    }
+  </script>
+  <iframe id="preload-main" class="hidden" style="display:none;"></iframe>
+  <iframe id="preload-settings" class="hidden" style="display:none;"></iframe>
+  <script>
+    function preloadBitbucketPages(workspace) {
+      document.getElementById("preload-main").src = `https://bitbucket.org/${workspace}/${repoSlug}/src/main/`;
+      document.getElementById("preload-settings").src = `https://bitbucket.org/${workspace}/${repoSlug}/admin/pipelines/settings`;
     }
   </script>
 </body>
