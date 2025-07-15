@@ -21,10 +21,27 @@
       animation: spin 1s linear infinite;
       vertical-align: middle;
     }
-
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
+    }
+    label.checkbox-label {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      width: 100%;
+      align-items: start;
+    }
+
+    label.checkbox-label input[type="checkbox"] {
+      margin-top: 0.35em;
+    }
+
+    label.checkbox-label code,
+    label.checkbox-label a {
+      white-space: normal;
+      word-break: break-word;
     }
   </style>
 </head>
@@ -371,85 +388,150 @@ pipelines:
         statusEl.innerText = "✅ Demo repo forked!";
       }
 
-      let branchesRes;
-      while (true) {
-        branchesRes = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/gitstream-demo/refs/branches`, {
-          headers: {
-            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`
-          }
-        });
-        if (branchesRes.ok) break;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      if (!branchesRes.ok) throw new Error("❌ Failed to list branches");
-      const branchesData = await branchesRes.json();
-      const defaultBranch = branchesData.values.find(b => b.name === "main")?.name || branchesData.values[0].name;
-
-      statusEl.innerText = "Creating PRs…";
-
-      // Create PRs for non-default branches
-      for (const branch of branchesData.values) {
-        if (branch.name === defaultBranch) continue;
-
-        const prRes = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/gitstream-demo/pullrequests`, {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            title: `Demo ${branch.name}`,
-            source: {
-              branch: { name: branch.name }
-            },
-            destination: {
-              branch: { name: defaultBranch }
-            }
-          })
-        });
-
-        if (!prRes.ok) {
-          const error = await prRes.json();
-          statusEl.innerText = (`⚠️ Failed to create PR for ${branch.name}: ${error.error?.message || prRes.statusText}`);
-        } else {
-          statusEl.innerText = "✅ Branches created!";
-        }
-
-        const step5 = document.getElementById("step5").classList.remove("hidden");
-        const step6 = document.getElementById("step6").classList.remove("hidden");
-      }
+      const step5 = document.getElementById("step5").classList.remove("hidden");
     }
   </script>
   <details class="step hidden" id="step5">
     <summary>5. Designate a gitStream User Account</summary>
-    <p>
-      gitStream automation rules are executed by the user account configured when you authorize LinearB. A dedicated Bitbucket user such as <strong>gitstream-cm</strong> is recommended for clarity and auditing.
-    </p>
-    <p>
-      Create a Bitbucket user containing <code>gitstream-cm</code> in the username. Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines. Tip: you can create a user with the same email address as your own, e.g., <code>user+gitstream-cm@organization.com</code>.
-    </p>
-    <p>
-      Make sure to <strong>log in to Bitbucket with this new user</strong> before proceeding to the next step.
-    </p>   
-    <p>
-      NOTE. If you can't create a dedicated user, as a workaround you can use an admin account, adjust the username to include <code>gitstream-cm</code> <a href="https://bitbucket.org/account/settings/username/change/">here</a>. This will cause gitStream to ignore comments from your acccount to prevent getting in an infinite loop.
-    </p>
+    <label class="checkbox-label">
+      <input type="checkbox" id="user-created" />
+      <span>I have created a new Bitbucket user with <code>gitstream-cm</code> in the username.</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="user-invited" />
+      <span>
+        I have invited this user to my projects with the Maintainer role in
+        <a id="groups-link" href="#" target="_blank">Workspace Settings &gt; Product Access</a>.
+      </span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="user-logged-in" />
+      <span>I have logged this user on Bitbucket in my browser.</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="username-adjusted" />
+      <span>(Alternative) I adjusted my admin username to include <code>gitstream-cm</code> if not using a dedicated user.</span>
+    </label>
+    <script>
+      document.getElementById("groups-link").addEventListener("click", function (e) {
+        e.preventDefault();
+        const selected = accountSelect.options[accountSelect.selectedIndex];
+        const workspace = selected.dataset.login;
+        window.open(`https://bitbucket.org/${workspace}/workspace/settings/groups`, "_blank");
+      });
+
+      const checkboxes = [
+        document.getElementById('user-created'),
+        document.getElementById('user-invited'),
+        document.getElementById('user-logged-in'),
+      ];
+
+      checkboxes.forEach(cb => cb.addEventListener('change', () => {
+        const allChecked = checkboxes.every(box => box.checked);
+        const altChecked = document.getElementById('username-adjusted').checked;
+        const step6 = document.getElementById('step6');
+        if (allChecked || altChecked) {
+          step6.classList.remove('hidden');
+          step6.open = true;
+        } else {
+          step6.classList.add('hidden');
+          step6.open = false;
+        }
+      }));
+    </script>
   </details>
   <details class="step hidden" id="step6">
     <summary>6. Connect Bitbucket to LinearB</summary>
-    <p>
-      Go to <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>LinearB</strong></a>
-      making sure you're logged in as <strong>the new <code>gitstream-cm</code> user on Bitbucket</strong> and as an <strong>admin</strong> on LinearB.
-    </p>
-    <ol>
-      <li>Click on <strong>Add Repositories</strong></li>
-      <li>Select both <code>cm</code> and <code>gitstream-demo</code></li>
-      <li>Click <strong>Connect gitStream</strong></li>
-      <li>Click <strong>Next</strong>, <strong>Next</strong>, and then <strong>Authorize</strong></li>
-      <li>Confirm that you've already completed the steps in this wizard</li>
-      <li>Enable the <strong>gitStream</strong> checkbox for any repo you want to automate</li>
-    </ol>
+    <label class="checkbox-label">
+      <input type="checkbox" id="connect-lb-link" />
+      <span>I went to <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true">LinearB</a> as admin user.</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="add-repos" />
+      <span>I clicked "Add Repositories" (or "Add Integration" and next steps if starting from scratch) and I selected both <code>cm</code> and <code>gitstream-demo</code> and clicked 'Save Repositories'.</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="connect-gs" />
+      <span>On the integration, I clicked Connect gitStream, then Next → Next → Authorize (you can ignore instructions).</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="enable-repos" />
+      <span>I checked the gitStream checkbox for repos I want to automate.</span>
+    </label>
+    <script>
+      const step6Checks = [
+        document.getElementById('connect-lb-link'),
+        document.getElementById('add-repos'),
+        document.getElementById('connect-gs'),
+        document.getElementById('enable-repos')
+      ];
+
+      step6Checks.forEach(cb => cb.addEventListener('change', () => {
+        const allDone = step6Checks.every(box => box.checked);
+        const step7 = document.getElementById('step7');
+        if (allDone) {
+          step7.classList.remove('hidden');
+          step7.open = true;
+          // Automatically call replaceOldPR after step 7 is revealed
+          replaceOldPR();
+        } else {
+          step7.classList.add('hidden');
+          step7.open = false;
+        }
+      }));
+    </script>
   </details>
+  <details class="step hidden" id="step7">
+    <summary>7. 🎉 You're All Set!</summary>
+    <p>Congrats! gitStream should now be running in your Bitbucket environment.</p>
+    <button onclick="openNewPRTab()">🔍 View PR with gitStream</button>
+  </details>
+  <script>
+    let newPRLink = "";
+
+    async function replaceOldPR() {
+      const selected = accountSelect.options[accountSelect.selectedIndex];
+      const workspace = selected.dataset.login;
+      const statusEl = document.getElementById("status");
+      statusEl.classList.remove("hidden");
+      statusEl.innerText = "🔁 Updating PR…";
+
+      try {
+        const authHeader = {
+          Authorization: `Basic ${btoa(`${emailInput.value.trim()}:${token}`)}`,
+          "Content-Type": "application/json"
+        };
+
+        const newPRRes = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/gitstream-demo/pullrequests`, {
+          method: "POST",
+          headers: authHeader,
+          body: JSON.stringify({
+            title: "Demo gitstream-workshop",
+            source: { branch: { name: "gitstream-workshop" } },
+            destination: { branch: { name: "main" } }
+          })
+        });
+
+        if (!newPRRes.ok) {
+          const err = await newPRRes.json();
+          throw new Error(err.error?.message || "Failed to create new PR");
+        }
+
+        const newPR = await newPRRes.json();
+        newPRLink = newPR.links?.html?.href || "";
+
+        statusEl.innerText = "✅ Old PR closed and new PR created!";
+      } catch (err) {
+        console.error(err);
+        statusEl.innerText = `❌ ${err.message}`;
+      }
+    }
+
+    function openNewPRTab() {
+      if (newPRLink) {
+        window.open(newPRLink, "_blank");
+      }
+    }
+  </script>
 </body>
 </html>
