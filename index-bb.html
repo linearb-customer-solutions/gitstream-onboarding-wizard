@@ -320,7 +320,11 @@ pipelines:
 
         await new Promise(resolve => setTimeout(resolve, 1000)); // wait 1s to ensure repo is ready
 
-        preloadBitbucketPages(workspace, repoSlug);
+        const anchor = document.createElement("a");
+        anchor.href = `https://bitbucket.org/${workspace}/${repoSlug}/admin/pipelines/settings`;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.click();
 
         // Enable pipelines with retry
         let enableSuccess = false;
@@ -535,14 +539,6 @@ pipelines:
       if (newPRLink) {
         window.open(newPRLink, "_blank");
       }
-    }
-  </script>
-  <iframe id="preload-main" class="hidden" style="display:none;"></iframe>
-  <iframe id="preload-settings" class="hidden" style="display:none;"></iframe>
-  <script>
-    function preloadBitbucketPages(workspace, repoSlug) {
-      document.getElementById("preload-main").src = `https://bitbucket.org/${workspace}/${repoSlug}/src/main/`;
-      document.getElementById("preload-settings").src = `https://bitbucket.org/${workspace}/${repoSlug}/admin/pipelines/settings`;
     }
   </script>
 </body>
