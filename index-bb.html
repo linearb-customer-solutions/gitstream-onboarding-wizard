@@ -540,7 +540,7 @@ pipelines:
   <iframe id="preload-main" class="hidden" style="display:none;"></iframe>
   <iframe id="preload-settings" class="hidden" style="display:none;"></iframe>
   <script>
-    function preloadBitbucketPages(workspace) {
+    function preloadBitbucketPages(workspace, repoSlug) {
       document.getElementById("preload-main").src = `https://bitbucket.org/${workspace}/${repoSlug}/src/main/`;
       document.getElementById("preload-settings").src = `https://bitbucket.org/${workspace}/${repoSlug}/admin/pipelines/settings`;
     }
