@@ -318,9 +318,9 @@ pipelines:
 
         statusEl.innerText = "✅ Repository created!";
 
-        await sleep(1000); // wait 1s to ensure repo is ready
+        await new Promise(resolve => setTimeout(resolve, 1000)); // wait 1s to ensure repo is ready
 
-        preloadBitbucketPages(workspac, repoSlug);
+        preloadBitbucketPages(workspace, repoSlug);
 
         // Enable pipelines with retry
         let enableSuccess = false;
