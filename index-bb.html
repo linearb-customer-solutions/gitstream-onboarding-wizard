@@ -131,9 +131,6 @@ automations:
           gt: 10
 
   linearb_ai_review:
-    on:
-      - pr_created
-      - commit
     if:
       - {{ not pr.draft }}
       - {{ not is.bot }}
@@ -143,9 +140,6 @@ automations:
           approve_on_LGTM: {{ calc.safe_changes }}
 
   linearb_ai_description:
-    on:
-      - pr_created
-      - commit
     if:
       - {{ not pr.draft }}
       - {{ not is.bot }}
@@ -452,7 +446,7 @@ pipelines:
     <summary>6. Connect Bitbucket to LinearB</summary>
     <label class="checkbox-label">
       <input type="checkbox" id="connect-lb-link" />
-      <span>I went to <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true">LinearB</a> as admin user.</span>
+      <span>I went to <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank">LinearB</a> as admin user.</span>
     </label>
     <label class="checkbox-label">
       <input type="checkbox" id="add-repos" />
