@@ -105,9 +105,6 @@ automations:
           gt: 10
 
   linearb_ai_review:
-    on:
-      - pr_created
-      - commit
     if:
       - {{ not pr.draft }}
       - {{ not is.bot }}
@@ -117,9 +114,6 @@ automations:
           approve_on_LGTM: {{ calc.safe_changes }}
 
   linearb_ai_description:
-    on:
-      - pr_created
-      - commit
     if:
       - {{ not pr.draft }}
       - {{ not is.bot }}
