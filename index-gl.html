@@ -21,7 +21,24 @@
       animation: spin 1s linear infinite;
       vertical-align: middle;
     }
+label.checkbox-label {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      width: 100%;
+      align-items: start;
+    }
 
+    label.checkbox-label input[type="checkbox"] {
+      margin-top: 0.35em;
+    }
+
+    label.checkbox-label code,
+    label.checkbox-label a {
+      white-space: normal;
+      word-break: break-word;
+    }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -394,86 +411,14 @@ tester-job:
       } else {
         statusEl.innerText = "✅ Demo project forked!";
       }
-
-      // Fetch branches of forked project
-      let forkedProjectId;
-      try {
-        let forkedProject;
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const forkedRes = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(groupPath + "/gitstream-demo")}`, {
-            headers: {
-              "PRIVATE-TOKEN": token
-            }
-          });
-          if (forkedRes.ok) {
-            forkedProject = await forkedRes.json();
-            break;
-          }
-          await new Promise(r => setTimeout(r, 2000)); // wait 2s between attempts
-        }
-        if (!forkedProject) {
-          statusEl.innerText = "❌ Failed to fetch forked project after multiple attempts";
-          return;
-        }
-        forkedProjectId = forkedProject.id;
-      } catch (err) {
-        statusEl.innerText = "❌ " + err.message;
-        return;
+      const userStep = document.getElementById("step5");
+      if (userStep) {
+        userStep.classList.remove("hidden");
+        userStep.open = true;
       }
-
-      const branchesRes = await fetch(`https://gitlab.com/api/v4/projects/${forkedProjectId}/repository/branches`, {
-        headers: {
-          "PRIVATE-TOKEN": token
-        }
-      });
-
-      if (!branchesRes.ok) {
-        statusEl.innerText = "❌ Failed to list branches";
-        return;
-      }
-      const branchesData = await branchesRes.json();
-      const defaultBranch = branchesData.find(b => b.default)?.name || branchesData[0]?.name;
-
-      statusEl.innerText = "Creating MRs…";
-
-      // Create MRs for non-default branches
-      for (const branch of branchesData) {
-        if (branch.name === defaultBranch) continue;
-
-        const mrRes = await fetch(`https://gitlab.com/api/v4/projects/${forkedProjectId}/merge_requests`, {
-          method: "POST",
-          headers: {
-            "PRIVATE-TOKEN": token,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            title: `Demo ${branch.name}`,
-            source_branch: branch.name,
-            target_branch: defaultBranch
-          })
-        });
-
-        if (!mrRes.ok) {
-          const error = await mrRes.json();
-          statusEl.innerText = (`✅ MR exists for ${branch.name}`);
-        } else {
-          statusEl.innerText = "✅ Branches created!";
-        }
-
-        const userStep = document.getElementById("step5");
-        if (userStep) {
-          userStep.classList.remove("hidden");
-          userStep.open = true;
-        }
-        const connectToLinb = document.getElementById("step6");
-        if (connectToLinb) {
-          connectToLinb.classList.remove("hidden");
-        }
-        const createUserLink = document.getElementById("create-user-link");
-        const groupPath = groupSelect.options[groupSelect.selectedIndex]?.dataset.path;
-        if (groupPath && createUserLink) {
-          createUserLink.href = `https://gitlab.com/groups/${groupPath}/-/group_members`;
-        }
+      const createUserLink = document.getElementById("create-user-link");
+      if (groupPath && createUserLink) {
+        createUserLink.href = `https://gitlab.com/groups/${groupPath}/-/group_members`;
       }
     }
   </script>
@@ -482,31 +427,136 @@ tester-job:
     <p>
       gitStream automation rules are executed by the user account configured when you authorize LinearB. A dedicated GitLab user containing <strong>gitstream-cm</strong> in the username is required for clarity and auditing.
     </p>
-    <p>
-      <a id="create-user-link" href="#" target="_blank"><strong>Create a Gitlab user</strong></a>
-      containing <code>gitstream-cm</code> in the username (e.g. <code>username-gitstream-cm</code> or <code>gitstream-cm_username</code>). Invite this user to your group or projects and give it at least the <strong>Maintainer</strong> role so it can run pipelines.
-    </p>
-    <p>
-      Tip: you can create a user by reusing the same email address, e.g., <code>user+gitstream-cm@organization.com</code> (see the part after the `+` sign).
-    </p>
-    <p>
-      After creating the user, make sure to log in to GitLab with this user account before proceeding to the next step.
-    </p>
+    <label class="checkbox-label">
+      <input type="checkbox" id="gitstream-user-created" />
+      <span>I <a id="create-user-link" href="#" target="_blank"><strong>created and invited a Gitlab user</strong></a> containing <code>gitstream-cm</code> in the username (e.g. <code>username-gitstream-cm</code> or <code>gitstream-cm_username</code>) with at least the <strong>Maintainer</strong> role.</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="logged-in-as-gitstream" />
+      <span>I logged in to GitLab with the <code>gitstream-cm</code> user account.</span>
+    </label>
   </details>
+  <script>
+    function checkStep5Completion() {
+      const userCreated = document.getElementById("gitstream-user-created").checked;
+      const loggedIn = document.getElementById("logged-in-as-gitstream").checked;
+      const step6 = document.getElementById("step6");
+      if (userCreated && loggedIn) {
+        step6.classList.remove("hidden");
+        step6.open = true;
+      } else {
+        step6.classList.add("hidden");
+      }
+    }
+
+    document.querySelectorAll('#step5 input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', checkStep5Completion);
+    });
+  </script>
   <details class="step hidden" id="step6">
    <summary>6. Connect GitLab to LinearB</summary>
-    <p>
-      Go to <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>LinearB</strong></a>
-      making sure you're logged in as <strong>the new <code>gitstream-cm</code> user on GitLab</strong> and as an <strong>admin</strong> on LinearB.
-    </p>
-    <ol>
-      <li>Click on <strong>Add Repositories</strong></li>
-      <li>Select both <code>cm</code> and <code>gitstream-demo</code></li>
-      <li>Click <strong>Connect gitStream</strong></li>
-      <li>Click <strong>Next</strong>, <strong>Next</strong>, and then <strong>Authorize</strong></li>
-      <li>Confirm that you've already completed the steps in this wizard</li>
-      <li>Enable the <strong>gitStream</strong> checkbox for any repo you want to automate</li>
-    </ol>
+    <label class="checkbox-label">
+      <input type="checkbox" id="login-to-linearb" />
+      <span>
+        I logged on to <a href="https://app.linearb.io/settings/git/repositories?isOrgSettings=true" target="_blank"><strong>LinearB</strong></a> as an <strong>admin</strong>.
+      </span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="add-integration" />
+      <span>I clicked on <strong>Add Repositories</strong> (or <strong>Add Integration</strong> if you haven't integrated GitLab yet).</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="connected-repos" />
+      <span>I selected <code>cm</code> and <code>gitstream-demo</code> repositories in LinearB.</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="authorized-gitstream" />
+      <span>I clicked on <strong>Connect gitStream</strong> and I clicked Next, Next, Authorize (ignoring instructions).</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="enabled-gitstream" />
+      <span>I checked the gitStream checkbox for all repos I want to automate the MRs on.</span>
+    </label>
+  </details>
+  <script>
+    // Check if all checkboxes in step6 are checked and reveal step7
+    async function checkStep6Completion() {
+      const allChecked = [...document.querySelectorAll('#step6 input[type="checkbox"]')].every(cb => cb.checked);
+      if (!allChecked) return;
+
+      const step7 = document.getElementById("step7");
+      step7.classList.remove("hidden");
+      step7.open = true;
+
+      const groupPath = groupSelect.options[groupSelect.selectedIndex]?.dataset.path;
+      const statusEl = document.getElementById("status");
+      statusEl.classList.remove("hidden");
+
+      try {
+        const forkedRes = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(groupPath + "/gitstream-demo")}`, {
+          headers: { "PRIVATE-TOKEN": token }
+        });
+
+        if (!forkedRes.ok) throw new Error("Failed to fetch forked project");
+        const forkedProject = await forkedRes.json();
+        const forkedProjectId = forkedProject.id;
+
+        const branchesRes = await fetch(`https://gitlab.com/api/v4/projects/${forkedProjectId}/repository/branches`, {
+          headers: { "PRIVATE-TOKEN": token }
+        });
+
+        if (!branchesRes.ok) throw new Error("Failed to list branches");
+        const branchesData = await branchesRes.json();
+        const defaultBranch = branchesData.find(b => b.default)?.name || branchesData[0]?.name;
+
+        statusEl.innerText = "Creating MRs…";
+
+        for (const branch of branchesData) {
+          if (branch.name === defaultBranch) continue;
+
+          const mrRes = await fetch(`https://gitlab.com/api/v4/projects/${forkedProjectId}/merge_requests`, {
+            method: "POST",
+            headers: {
+              "PRIVATE-TOKEN": token,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              title: `Demo ${branch.name}`,
+              source_branch: branch.name,
+              target_branch: defaultBranch
+            })
+          });
+
+          if (!mrRes.ok) {
+            const error = await mrRes.json();
+            console.warn(`MR exists or failed for ${branch.name}:`, error);
+            statusEl.innerText += `\n✅ MR already exists or error for ${branch.name}`;
+          } else {
+            statusEl.innerText += `\n✅ Created MR for ${branch.name}`;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        statusEl.innerText = "❌ " + err.message;
+      }
+    }
+
+    document.querySelectorAll('#step6 input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', checkStep6Completion);
+    });
+
+    function openCreatedMR() {
+      const groupPath = groupSelect.options[groupSelect.selectedIndex]?.dataset.path;
+      if (groupPath) {
+        window.open(`https://gitlab.com/${groupPath}/gitstream-demo/-/merge_requests`, "_blank");
+      }
+    }
+  </script>
+
+  <details class="step hidden" id="step7">
+    <summary>7. View Your First gitStream Automation</summary>
+    <p>Open your first Merge Request in the <code>gitstream-demo</code> project to see gitStream in action.</p>
+    <button onclick="openCreatedMR()">Open Merge Request</button>
   </details>
 </body>
 </html>
